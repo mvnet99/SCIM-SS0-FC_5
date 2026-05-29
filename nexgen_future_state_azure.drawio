@@ -1,0 +1,241 @@
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- Title -->
+    <mxCell id="title" value="NexGen GM + PRPC — Future State (Azure Automated)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#1e1e1e;" vertex="1" parent="1">
+      <mxGeometry x="150" y="15" width="700" height="30" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════
+         SWIM LANES: External | Azure | External (Target)
+         ═══════════════════════════════════════════════════ -->
+
+    <!-- DBA / Engineering (external, left) -->
+    <mxCell id="swim_ext" value="External" style="swimlane;startSize=20;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="30" y="55" width="160" height="700" as="geometry" />
+    </mxCell>
+
+    <!-- Azure boundary -->
+    <mxCell id="swim_azure" value="Microsoft Azure" style="swimlane;startSize=20;fillColor=#ddeeff;strokeColor=#0078D4;fontColor=#0078D4;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="200" y="55" width="780" height="700" as="geometry" />
+    </mxCell>
+
+    <!-- Target (external, right) -->
+    <mxCell id="swim_target" value="External (Target)" style="swimlane;startSize=20;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="990" y="55" width="150" height="700" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         AZURE SUB-CONTAINERS
+         ═══════════════════════════════════════ -->
+
+    <!-- Blob Storage group -->
+    <mxCell id="grp_blob" value="Azure Blob Storage" style="swimlane;startSize=24;fillColor=#dae8fc;strokeColor=#0078D4;fontColor=#0078D4;fontSize=11;fontStyle=1;dashed=1;arcSize=4;" vertex="1" parent="swim_azure">
+      <mxGeometry x="20" y="40" width="220" height="560" as="geometry" />
+    </mxCell>
+
+    <!-- Logic Apps group -->
+    <mxCell id="grp_la" value="Azure Logic Apps" style="swimlane;startSize=24;fillColor=#e8def8;strokeColor=#7B5EA7;fontColor=#7B5EA7;fontSize=11;fontStyle=1;dashed=1;arcSize=4;" vertex="1" parent="swim_azure">
+      <mxGeometry x="260" y="40" width="240" height="560" as="geometry" />
+    </mxCell>
+
+    <!-- API / AKS group -->
+    <mxCell id="grp_api" value="Azure Kubernetes (AKS)" style="swimlane;startSize=24;fillColor=#dae8fc;strokeColor=#0078D4;fontColor=#0078D4;fontSize=11;fontStyle=1;dashed=1;arcSize=4;" vertex="1" parent="swim_azure">
+      <mxGeometry x="520" y="40" width="240" height="380" as="geometry" />
+    </mxCell>
+
+    <!-- Key Vault group -->
+    <mxCell id="grp_kv" value="Azure Key Vault" style="swimlane;startSize=24;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#BA7517;fontSize=11;fontStyle=1;dashed=1;arcSize=4;" vertex="1" parent="swim_azure">
+      <mxGeometry x="520" y="440" width="240" height="120" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         BLOB CONTAINERS (inside Blob group)
+         ═══════════════════════════════════════ -->
+
+    <!-- fc-hold-target -->
+    <mxCell id="blob_src" value="" style="shape=mxgraph.azure2.storage_blob;fillColor=#0078D4;strokeColor=none;fontColor=#ffffff;" vertex="1" parent="grp_blob">
+      <mxGeometry x="20" y="40" width="40" height="40" as="geometry" />
+    </mxCell>
+    <mxCell id="blob_src_lbl" value="&lt;b&gt;fc-hold-target&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;GM + PRPC .txt files&lt;br/&gt;(DBA drops here)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;arcSize=10;" vertex="1" parent="grp_blob">
+      <mxGeometry x="15" y="90" width="190" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- nexgen-delivery -->
+    <mxCell id="blob_dest" value="" style="shape=mxgraph.azure2.storage_blob;fillColor=#0078D4;strokeColor=none;" vertex="1" parent="grp_blob">
+      <mxGeometry x="20" y="200" width="40" height="40" as="geometry" />
+    </mxCell>
+    <mxCell id="blob_dest_lbl" value="&lt;b&gt;nexgen-delivery&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Zipped output files&lt;br/&gt;Logic Apps reads from here&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;arcSize=10;" vertex="1" parent="grp_blob">
+      <mxGeometry x="15" y="250" width="190" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- flexcount-save -->
+    <mxCell id="blob_arch" value="" style="shape=mxgraph.azure2.storage_blob;fillColor=#666666;strokeColor=none;" vertex="1" parent="grp_blob">
+      <mxGeometry x="20" y="360" width="40" height="40" as="geometry" />
+    </mxCell>
+    <mxCell id="blob_arch_lbl" value="&lt;b&gt;flexcount-save&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Backup archive&lt;br/&gt;(zip + original .txt)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;arcSize=10;" vertex="1" parent="grp_blob">
+      <mxGeometry x="15" y="410" width="190" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         LOGIC APPS STEPS
+         ═══════════════════════════════════════ -->
+
+    <!-- 1. Recurrence trigger -->
+    <mxCell id="la_trigger" value="" style="shape=mxgraph.azure2.logic_apps;fillColor=#7B5EA7;strokeColor=none;" vertex="1" parent="grp_la">
+      <mxGeometry x="20" y="40" width="40" height="40" as="geometry" />
+    </mxCell>
+    <mxCell id="la_trigger_lbl" value="&lt;b&gt;Recurrence trigger&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Wed + Fri schedule (before 9:30 AM EST)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8def8;strokeColor=#7B5EA7;fontSize=11;arcSize=10;" vertex="1" parent="grp_la">
+      <mxGeometry x="15" y="90" width="210" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- 2. HTTP POST to API -->
+    <mxCell id="la_http" value="&lt;b&gt;HTTP POST action&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;POST /api/NexGen/PostFiles&lt;br/&gt;X-Api-Key header (from Key Vault)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8def8;strokeColor=#7B5EA7;fontSize=11;arcSize=10;" vertex="1" parent="grp_la">
+      <mxGeometry x="15" y="185" width="210" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- 3. Read zip from nexgen-delivery blob -->
+    <mxCell id="la_readblob" value="&lt;b&gt;Read zip from Blob&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Blob connector → nexgen-delivery&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8def8;strokeColor=#7B5EA7;fontSize=11;arcSize=10;" vertex="1" parent="grp_la">
+      <mxGeometry x="15" y="290" width="210" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- 4. SFTP deliver -->
+    <mxCell id="la_sftp" value="&lt;b&gt;SFTP-SSH connector&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Deliver zip to Target pickup folder&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8def8;strokeColor=#7B5EA7;fontSize=11;arcSize=10;" vertex="1" parent="grp_la">
+      <mxGeometry x="15" y="385" width="210" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- 5. Notify -->
+    <mxCell id="la_notify" value="&lt;b&gt;Notify team&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Teams / email — success or failure&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8def8;strokeColor=#7B5EA7;fontSize=11;arcSize=10;" vertex="1" parent="grp_la">
+      <mxGeometry x="15" y="480" width="210" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         API / AKS
+         ═══════════════════════════════════════ -->
+
+    <mxCell id="api_icon" value="" style="shape=mxgraph.azure2.api_management;fillColor=#0078D4;strokeColor=none;" vertex="1" parent="grp_api">
+      <mxGeometry x="20" y="40" width="40" height="40" as="geometry" />
+    </mxCell>
+    <mxCell id="api_endpoint" value="&lt;b&gt;NexGen endpoint&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;POST /api/NexGen/PostFiles&lt;br/&gt;Auth: X-Api-Key header&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;arcSize=10;" vertex="1" parent="grp_api">
+      <mxGeometry x="15" y="90" width="210" height="70" as="geometry" />
+    </mxCell>
+
+    <mxCell id="api_logic" value="&lt;b&gt;NexGenService&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;1. Validate inputs&lt;br/&gt;2. Scan Blob for matching files&lt;br/&gt;3. Stream .txt → zip in memory&lt;br/&gt;4. Write zip to nexgen-delivery&lt;br/&gt;5. Write backup to flexcount-save&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;arcSize=10;" vertex="1" parent="grp_api">
+      <mxGeometry x="15" y="185" width="210" height="130" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         KEY VAULT
+         ═══════════════════════════════════════ -->
+
+    <mxCell id="kv_icon" value="" style="shape=mxgraph.azure2.key_vault;fillColor=#d6b656;strokeColor=none;" vertex="1" parent="grp_kv">
+      <mxGeometry x="20" y="30" width="40" height="40" as="geometry" />
+    </mxCell>
+    <mxCell id="kv_lbl" value="&lt;b&gt;Secrets&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;NexGenApiKey · BlobConnectionString&lt;br/&gt;SFTPServerSSHPrivateKey&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;arcSize=10;" vertex="1" parent="grp_kv">
+      <mxGeometry x="75" y="25" width="155" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         DBA (in external swim lane)
+         ═══════════════════════════════════════ -->
+
+    <mxCell id="dba" value="&lt;b&gt;DBA / Engineering&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Validate files&lt;br/&gt;(TargetTotalsCheck.exe)&lt;br/&gt;Upload GM + PRPC .txt&lt;br/&gt;to Blob Storage&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;arcSize=10;" vertex="1" parent="swim_ext">
+      <mxGeometry x="10" y="100" width="140" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         TARGET SFTP (in external swim lane)
+         ═══════════════════════════════════════ -->
+
+    <mxCell id="target_sftp" value="&lt;b&gt;Target SFTP server&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Pickup folder&lt;br/&gt;Target polls and&lt;br/&gt;collects zip files&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;arcSize=10;" vertex="1" parent="swim_target">
+      <mxGeometry x="10" y="370" width="130" height="90" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         FLOW ARROWS (cross-container)
+         ═══════════════════════════════════════ -->
+
+    <!-- DBA → fc-hold-target blob (cross swim lanes) -->
+    <mxCell id="e_dba_blob" value="uploads .txt files" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0078D4;fontSize=10;" edge="1" source="dba" target="blob_src_lbl" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Trigger → HTTP POST (within Logic Apps) -->
+    <mxCell id="e_trig_http" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7B5EA7;" edge="1" source="la_trigger_lbl" target="la_http" parent="grp_la">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- HTTP POST → Logic Apps reads blob -->
+    <mxCell id="e_http_read" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7B5EA7;" edge="1" source="la_http" target="la_readblob" parent="grp_la">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Logic Apps read blob → SFTP -->
+    <mxCell id="e_read_sftp" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7B5EA7;" edge="1" source="la_readblob" target="la_sftp" parent="grp_la">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- SFTP → Notify -->
+    <mxCell id="e_sftp_notify" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7B5EA7;" edge="1" source="la_sftp" target="la_notify" parent="grp_la">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Logic Apps HTTP POST → API endpoint (cross containers) -->
+    <mxCell id="e_la_api" value="POST + X-Api-Key" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0078D4;fontSize=10;" edge="1" source="la_http" target="api_endpoint" parent="swim_azure">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- API reads from source blob -->
+    <mxCell id="e_api_src" value="stream .txt files" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0078D4;fontSize=10;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" source="api_logic" target="blob_src_lbl" parent="swim_azure">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- API writes zip to delivery -->
+    <mxCell id="e_api_dest" value="write zip" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;fontSize=10;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" source="api_logic" target="blob_dest_lbl" parent="swim_azure">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- API writes backup to archive -->
+    <mxCell id="e_api_arch" value="write backup" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;fontSize=10;exitX=0;exitY=0.8;entryX=1;entryY=0.5;" edge="1" source="api_logic" target="blob_arch_lbl" parent="swim_azure">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Key Vault → API (secrets at startup) -->
+    <mxCell id="e_kv_api" value="secrets at startup" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#d6b656;dashed=1;fontSize=10;" edge="1" source="kv_lbl" target="api_endpoint" parent="swim_azure">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Logic Apps SFTP → Target (cross swim lanes) -->
+    <mxCell id="e_sftp_target" value="SFTP deliver zip" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;fontSize=10;" edge="1" source="la_sftp" target="target_sftp" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Logic Apps reads delivery blob -->
+    <mxCell id="e_la_blob" value="reads zip" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7B5EA7;fontSize=10;" edge="1" source="la_readblob" target="blob_dest_lbl" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════
+         LEGEND
+         ═══════════════════════════════════════ -->
+
+    <mxCell id="legend_title" value="Legend" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="30" y="780" width="60" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="leg1" value="Blob Storage container" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="100" y="778" width="160" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="leg2" value="Logic Apps action" style="rounded=1;fillColor=#e8def8;strokeColor=#7B5EA7;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="275" y="778" width="160" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="leg3" value="API service" style="rounded=1;fillColor=#dae8fc;strokeColor=#0078D4;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="450" y="778" width="160" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="leg4" value="External system" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="625" y="778" width="160" height="24" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>
