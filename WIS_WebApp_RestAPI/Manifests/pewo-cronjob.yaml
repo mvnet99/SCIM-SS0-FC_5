@@ -1,0 +1,106 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pewo-worker-hourly
+  labels:
+    app: pewo-worker
+    component: workflow-orchestrator
+spec:
+  # Default: hourly. Add fixed-time entries per environment (e.g. 0 8 * * 3,5 for Wed+Fri 8AM UTC).
+  schedule: "0 * * * *"
+  # Prevent overlapping cron instances — if a job is still running when the next fires, skip it.
+  concurrencyPolicy: Forbid
+  # Keep last 3 successful and 1 failed job pod for log inspection.
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      # Pods clean up after 10 minutes regardless of outcome.
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels:
+            app: pewo-worker
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pewo-trigger
+              # Reuses the existing WIS_WebApp_RestAPI image — no new image, no new CI/CD pipeline.
+              image: #{ContainerName}#:{{ImageTag}}
+              command:
+                - curl
+                - --fail
+                - --silent
+                - --show-error
+                - --max-time
+                - "300"
+                - --header
+                - "X-Api-Key: $(PEWO_API_KEY)"
+                - --request
+                - POST
+                - "http://wis-webapp-restapi-service/api/pewo/worker/run"
+              env:
+                - name: PEWO_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: pewo-secrets
+                      key: api-key
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+
+---
+# Fixed-time schedule for Wed + Fri 8AM UTC (in addition to hourly safety net above)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pewo-worker-wf-8am
+  labels:
+    app: pewo-worker
+    component: workflow-orchestrator
+spec:
+  schedule: "0 8 * * 3,5"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels:
+            app: pewo-worker
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pewo-trigger
+              image: #{ContainerName}#:{{ImageTag}}
+              command:
+                - curl
+                - --fail
+                - --silent
+                - --show-error
+                - --max-time
+                - "300"
+                - --header
+                - "X-Api-Key: $(PEWO_API_KEY)"
+                - --request
+                - POST
+                - "http://wis-webapp-restapi-service/api/pewo/worker/run"
+              env:
+                - name: PEWO_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: pewo-secrets
+                      key: api-key
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
