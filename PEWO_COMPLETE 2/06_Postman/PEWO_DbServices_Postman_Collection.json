@@ -1,0 +1,720 @@
+{
+  "info": {
+    "name": "PEWO — DB Services API (localhost:7141)",
+    "description": "End-to-end testing for PEWO DB Services API.\n\nBASE URL: https://localhost:7141\n\nBEFORE RUNNING:\n1. Run Pewo_StepKind seed (if table is empty)\n2. Run all 5 workflow seed files in order (id_Customer=47)\n3. Set environment variables below from SSMS verification queries\n4. Run requests in folder order — each folder captures IDs automatically\n\nSSMS — get IDs after seeding:\nSELECT id_CustomerWorkflowType, WorkflowType_Code FROM dbo.Pewo_CustomerWorkflowType WHERE id_Customer=47;\nSELECT id_Schedule, Schedule_Name FROM dbo.Pewo_Schedule s JOIN dbo.Pewo_CustomerWorkflowType c ON c.id_CustomerWorkflowType=s.id_CustomerWorkflowType WHERE c.id_Customer=47;",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",                    "value": "https://localhost:7141",  "type": "string" },
+    { "key": "idCustomer",                 "value": "47",                      "type": "string" },
+    { "key": "gmTotalsCheckTypeId",        "value": "SET_FROM_SSMS",           "type": "string", "description": "id_CustomerWorkflowType for GM_TOTALS_CHECK" },
+    { "key": "gmTotalsScheduleId",         "value": "SET_FROM_SSMS",           "type": "string", "description": "id_Schedule for GM_TOTALS_CHECK" },
+    { "key": "gmPrcDeliveryTypeId",        "value": "SET_FROM_SSMS",           "type": "string", "description": "id_CustomerWorkflowType for GM_PRC_DELIVERY" },
+    { "key": "gmPrcScheduleId",            "value": "SET_FROM_SSMS",           "type": "string", "description": "id_Schedule for GM_PRC_DELIVERY" },
+    { "key": "gmPrcSummaryTypeId",         "value": "SET_FROM_SSMS",           "type": "string", "description": "id_CustomerWorkflowType for GM_PRC_DELIVERY_SUMMARY" },
+    { "key": "gmPrcSummaryScheduleId",     "value": "SET_FROM_SSMS",           "type": "string", "description": "id_Schedule for GM_PRC_DELIVERY_SUMMARY" },
+    { "key": "meoDailyTypeId",             "value": "SET_FROM_SSMS",           "type": "string", "description": "id_CustomerWorkflowType for MEO_DAILY" },
+    { "key": "meoDailyScheduleId",         "value": "SET_FROM_SSMS",           "type": "string", "description": "id_Schedule for MEO_DAILY" },
+    { "key": "gmTotalsRunId",              "value": "",                         "type": "string", "description": "Captured automatically from POST /runs" },
+    { "key": "gmPrcRunId",                 "value": "",                         "type": "string", "description": "Captured automatically from POST /runs" },
+    { "key": "gmPrcSummaryRunId",          "value": "",                         "type": "string", "description": "Captured automatically from POST /runs" },
+    { "key": "meoDailyRunId",              "value": "",                         "type": "string", "description": "Captured automatically from POST /runs" },
+    { "key": "totalsCheckStepDefId",       "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "totalsCheckEmailStepDefId",  "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "readBlobZipStepDefId",       "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "sftpStepDefId",              "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "archiveStepDefId",           "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "meoGetEventsStepDefId",      "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "meoTransformStepDefId",      "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "meoReadBlobZipStepDefId",    "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "meoSftpStepDefId",           "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "meoEmailStepDefId",          "value": "",                         "type": "string", "description": "Captured from GET /resume" },
+    { "key": "eventGuid",                  "value": "aaaaaaaa-1111-0000-0000-000000000047", "type": "string" },
+    { "key": "idEvent",                    "value": "5001",                     "type": "string" },
+    { "key": "storeNo",                    "value": "T1234",                    "type": "string" },
+    { "key": "storeName",                  "value": "Target Allen TX",          "type": "string" },
+    { "key": "batchKey",                   "value": "",                         "type": "string", "description": "Captured from today date" }
+  ],
+  "item": [
+
+    {
+      "name": "0. Setup — Verify Seed Data",
+      "description": "Run these first to confirm seed data is in place and capture IDs into Postman variables.",
+      "item": [
+        {
+          "name": "0.1 GET Due Jobs — Verify Schedules Exist",
+          "description": "BEFORE RUNNING: In SSMS advance a schedule to be due:\nUPDATE dbo.Pewo_Schedule SET Next_Run_At = DATEADD(MINUTE,-1,GETUTCDATE()) WHERE id_Schedule = {{gmTotalsScheduleId}}\n\nExpected: array with at least one job. If empty — seed data missing or Next_Run_At still in future.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/PewoData/due-jobs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","due-jobs"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const jobs = pm.response.json();",
+                "pm.test('At least one due job', () => pm.expect(jobs.length).to.be.above(0));",
+                "console.log('Due jobs:', JSON.stringify(jobs.map(j => j.workflowType_Code)));"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "1. Day 1 — GM TOTALS CHECK",
+      "description": "Simulates the same-day totals check triggered by event close.\nSSMS before starting: UPDATE dbo.Pewo_Schedule SET Next_Run_At = DATEADD(MINUTE,-1,GETUTCDATE()) WHERE id_Schedule = {{gmTotalsScheduleId}}",
+      "item": [
+
+        {
+          "name": "1.1 POST workflow-trigger — Prime GM_TOTALS_CHECK",
+          "description": "Simulates the event-close hook. Creates WorkflowRun + WorkflowRunEvent atomically via SP.\nExpected: array with one object containing id_WorkflowRun, id_CustomerWorkflowType, workflowType_Code.\nCaptures gmTotalsRunId automatically.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_Customer\": {{idCustomer}},\n  \"id_Event\": {{idEvent}},\n  \"store_No\": \"{{storeNo}}\",\n  \"store_Name\": \"{{storeName}}\",\n  \"event_Date\": \"2025-01-01T23:00:00Z\",\n  \"workflowType_Code\": \"GM_TOTALS_CHECK\",\n  \"event_Guid\": \"{{eventGuid}}\",\n  \"id_Store\": 5,\n  \"event_Status\": \"CLOSED\",\n  \"event_Scheduled_Date\": \"2025-01-01T06:00:00Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/workflow-trigger", "host": ["{{baseUrl}}"], "path": ["api","PewoData","workflow-trigger"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const result = pm.response.json();",
+                "pm.test('Returns array with runs created', () => pm.expect(result).to.be.an('array').with.length.above(0));",
+                "const gmTotalsRun = result.find(r => r.workflowType_Code === 'GM_TOTALS_CHECK');",
+                "if (gmTotalsRun) {",
+                "  pm.collectionVariables.set('gmTotalsRunId', gmTotalsRun.id_WorkflowRun);",
+                "  console.log('GM_TOTALS_CHECK RunId captured:', gmTotalsRun.id_WorkflowRun);",
+                "}",
+                "pm.test('GM_TOTALS_CHECK run created', () => pm.expect(gmTotalsRun).to.not.be.undefined);"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "1.2 GET Due Jobs — Confirm GM_TOTALS_CHECK Due",
+          "description": "Confirms the workflow-trigger primed the schedule and the run appears as due.\nExpected: GM_TOTALS_CHECK in results with Job_Source = SCHEDULE or NEW_CHILD.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/PewoData/due-jobs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","due-jobs"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const jobs = pm.response.json();",
+                "const totalsJob = jobs.find(j => j.workflowType_Code === 'GM_TOTALS_CHECK');",
+                "pm.test('GM_TOTALS_CHECK is due', () => pm.expect(totalsJob).to.not.be.undefined);",
+                "console.log('GM_TOTALS_CHECK job:', JSON.stringify(totalsJob));"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "1.3 GET Run Resume — Load Steps for GM_TOTALS_CHECK",
+          "description": "Loads step definitions + current step run state for the run.\nExpected: 2 steps — TOTALS_CHECK (order 1) and EMAIL (order 2), both with null status (not started).\nCaptures step def IDs automatically.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/PewoData/runs/{{gmTotalsRunId}}/resume?idCustomerWorkflowType={{gmTotalsCheckTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","PewoData","runs","{{gmTotalsRunId}}","resume"],
+              "query": [{ "key": "idCustomerWorkflowType", "value": "{{gmTotalsCheckTypeId}}" }]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const steps = pm.response.json();",
+                "pm.test('2 steps returned', () => pm.expect(steps.length).to.equal(2));",
+                "const totalsStep = steps.find(s => s.step_Kind === 'TOTALS_CHECK');",
+                "const emailStep  = steps.find(s => s.step_Kind === 'EMAIL');",
+                "if (totalsStep) pm.collectionVariables.set('totalsCheckStepDefId', totalsStep.id_WorkflowStepDef);",
+                "if (emailStep)  pm.collectionVariables.set('totalsCheckEmailStepDefId', emailStep.id_WorkflowStepDef);",
+                "pm.test('TOTALS_CHECK step found', () => pm.expect(totalsStep).to.not.be.undefined);",
+                "pm.test('EMAIL step found',         () => pm.expect(emailStep).to.not.be.undefined);",
+                "console.log('TOTALS_CHECK stepDefId:', totalsStep?.id_WorkflowStepDef);",
+                "console.log('EMAIL stepDefId:',        emailStep?.id_WorkflowStepDef);"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "1.4 GET Run Events — Confirm WorkflowRunEvent Row",
+          "description": "Confirms the WorkflowRunEvent row was created by workflow-trigger with correct Event_Guid.\nExpected: 1 row with store_No=T1234 and event_Guid matching {{eventGuid}}.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmTotalsRunId}}/events", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmTotalsRunId}}","events"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const events = pm.response.json();",
+                "pm.test('At least one event row', () => pm.expect(events.length).to.be.above(0));",
+                "pm.test('Event_Guid populated', () => pm.expect(events[0].event_Guid).to.not.be.null);",
+                "console.log('Run events:', JSON.stringify(events));"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "1.5 POST Upsert Step — TOTALS_CHECK COMPLETED",
+          "description": "Marks the TOTALS_CHECK step as COMPLETED with a simulated artifact_ref.\nIn production this is called by PewoWorkerService after PewoStepService.TotalsCheck() returns success.\nExpected: HTTP 200 empty body.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{gmTotalsRunId}},\n  \"id_WorkflowStepDef\": {{totalsCheckStepDefId}},\n  \"step_Kind\": \"TOTALS_CHECK\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": null,\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-01T08:00:00Z\",\n  \"end_Time\": \"2025-01-01T08:00:03Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmTotalsRunId}}/steps/{{totalsCheckStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmTotalsRunId}}","steps","{{totalsCheckStepDefId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "1.6 POST Upsert Step — EMAIL COMPLETED",
+          "description": "Marks the EMAIL step as COMPLETED.\nExpected: HTTP 200 empty body.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{gmTotalsRunId}},\n  \"id_WorkflowStepDef\": {{totalsCheckEmailStepDefId}},\n  \"step_Kind\": \"EMAIL\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"notified:2025-01-01T08:00:05Z\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-01T08:00:03Z\",\n  \"end_Time\": \"2025-01-01T08:00:05Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmTotalsRunId}}/steps/{{totalsCheckEmailStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmTotalsRunId}}","steps","{{totalsCheckEmailStepDefId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "1.7 POST Set Run COMPLETED — GM_TOTALS_CHECK",
+          "description": "Closes the GM_TOTALS_CHECK run as COMPLETED.\nExpected: HTTP 200. Verify in SSMS: SELECT Status, Finished_At FROM dbo.Pewo_WorkflowRun WHERE id_WorkflowRun = {{gmTotalsRunId}}",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\",\n  \"reason\": null,\n  \"retry_At\": null,\n  \"retry_Count\": 0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmTotalsRunId}}/status", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmTotalsRunId}}","status"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "1.8 POST Advance Schedule — GM_TOTALS_CHECK",
+          "description": "Pushes Next_Run_At 50 years out (EVENT_PRIMED sentinel — schedule never self-fires).\nExpected: HTTP 200.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"next_Run_At\": \"2075-01-01T00:00:00Z\",\n  \"last_Run_Id\": {{gmTotalsRunId}},\n  \"last_Status\": \"COMPLETED\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/schedules/{{gmTotalsScheduleId}}/advance", "host": ["{{baseUrl}}"], "path": ["api","PewoData","schedules","{{gmTotalsScheduleId}}","advance"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "1.9 POST Insert Log — GM_TOTALS_CHECK Run Complete",
+          "description": "Writes a run-completion log row to Pewo_WorkflowRunLog.\nExpected: HTTP 200. Verify: SELECT * FROM dbo.Pewo_WorkflowRunLog WHERE id_WorkflowRun = {{gmTotalsRunId}}",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{gmTotalsRunId}},\n  \"id_Customer\": {{idCustomer}},\n  \"customer_Name\": \"TARGET FLEXCOUNT\",\n  \"step_Kind\": null,\n  \"log_Level\": \"INFO\",\n  \"message\": \"GM_TOTALS_CHECK run COMPLETED — all steps passed\",\n  \"event_Context\": \"{{eventGuid}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/logs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","logs"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        }
+
+      ]
+    },
+
+    {
+      "name": "2. Day 2 — GM PRC DELIVERY (NGen Files)",
+      "description": "Simulates the next-day 8AM cron delivery of GM + PRPC files.\nSSMS before starting:\nUPDATE dbo.Pewo_Schedule SET Next_Run_At = DATEADD(MINUTE,-1,GETUTCDATE()) WHERE id_Schedule = {{gmPrcScheduleId}}",
+      "item": [
+
+        {
+          "name": "2.1 GET Due Jobs — Confirm GM_PRC_DELIVERY Due",
+          "description": "Advance GM_PRC_DELIVERY schedule in SSMS first (see folder description).\nExpected: GM_PRC_DELIVERY in results.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/PewoData/due-jobs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","due-jobs"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const jobs = pm.response.json();",
+                "const prcJob = jobs.find(j => j.workflowType_Code === 'GM_PRC_DELIVERY');",
+                "pm.test('GM_PRC_DELIVERY is due', () => pm.expect(prcJob).to.not.be.undefined);",
+                "console.log('GM_PRC_DELIVERY job:', JSON.stringify(prcJob));"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "2.2 POST Create WorkflowRun — GM_PRC_DELIVERY",
+          "description": "Creates a new WorkflowRun for GM_PRC_DELIVERY.\nExpected: integer — the new id_WorkflowRun. Captured as gmPrcRunId.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_Schedule\": {{gmPrcScheduleId}},\n  \"id_CustomerWorkflowType\": {{gmPrcDeliveryTypeId}},\n  \"max_Retries\": 3\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const runId = pm.response.json();",
+                "pm.test('RunId is a positive integer', () => pm.expect(runId).to.be.above(0));",
+                "pm.collectionVariables.set('gmPrcRunId', runId);",
+                "console.log('GM_PRC_DELIVERY RunId:', runId);"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "2.3 POST Create WorkflowRunEvent — GM_PRC_DELIVERY",
+          "description": "Links this run to the inventory event. Uses same eventGuid as Day 1.\nExpected: integer — new id_WorkflowRunEvent.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{gmPrcRunId}},\n  \"id_Event\": {{idEvent}},\n  \"id_Customer\": {{idCustomer}},\n  \"id_Store\": 5,\n  \"store_No\": \"{{storeNo}}\",\n  \"store_Name\": \"{{storeName}}\",\n  \"event_Guid\": \"{{eventGuid}}\",\n  \"event_Status\": \"CLOSED\",\n  \"event_Scheduled_Date\": \"2025-01-01T06:00:00Z\",\n  \"event_Date\": \"2025-01-01T23:00:00Z\",\n  \"metadata_Json\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmPrcRunId}}/events", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmPrcRunId}}","events"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Event row ID returned', () => pm.expect(pm.response.json()).to.be.above(0));"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "2.4 GET Run Resume — Load Steps for GM_PRC_DELIVERY",
+          "description": "Expected: 3 steps — READ_BLOB_ZIP (1), SFTP (2), ARCHIVE (3). All status null.\nCaptures step def IDs automatically.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/PewoData/runs/{{gmPrcRunId}}/resume?idCustomerWorkflowType={{gmPrcDeliveryTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","PewoData","runs","{{gmPrcRunId}}","resume"],
+              "query": [{ "key": "idCustomerWorkflowType", "value": "{{gmPrcDeliveryTypeId}}" }]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const steps = pm.response.json();",
+                "pm.test('3 steps returned', () => pm.expect(steps.length).to.equal(3));",
+                "const rbz  = steps.find(s => s.step_Kind === 'READ_BLOB_ZIP');",
+                "const sftp = steps.find(s => s.step_Kind === 'SFTP');",
+                "const arch = steps.find(s => s.step_Kind === 'ARCHIVE');",
+                "if (rbz)  pm.collectionVariables.set('readBlobZipStepDefId', rbz.id_WorkflowStepDef);",
+                "if (sftp) pm.collectionVariables.set('sftpStepDefId', sftp.id_WorkflowStepDef);",
+                "if (arch) pm.collectionVariables.set('archiveStepDefId', arch.id_WorkflowStepDef);",
+                "pm.test('READ_BLOB_ZIP found', () => pm.expect(rbz).to.not.be.undefined);",
+                "pm.test('SFTP found',          () => pm.expect(sftp).to.not.be.undefined);",
+                "pm.test('ARCHIVE found',        () => pm.expect(arch).to.not.be.undefined);"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "2.5 POST Upsert Step — READ_BLOB_ZIP COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{gmPrcRunId}},\n  \"id_WorkflowStepDef\": {{readBlobZipStepDefId}},\n  \"step_Kind\": \"READ_BLOB_ZIP\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"zip:pewo/staging/{{gmPrcRunId}}/delivery.zip\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-02T08:00:00Z\",\n  \"end_Time\": \"2025-01-02T08:00:08Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmPrcRunId}}/steps/{{readBlobZipStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmPrcRunId}}","steps","{{readBlobZipStepDefId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "2.6 POST Upsert Step — SFTP COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{gmPrcRunId}},\n  \"id_WorkflowStepDef\": {{sftpStepDefId}},\n  \"step_Kind\": \"SFTP\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"sftp:delivered:delivery_{{gmPrcRunId}}.zip:2025-01-02T08:00:10Z\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-02T08:00:08Z\",\n  \"end_Time\": \"2025-01-02T08:00:12Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmPrcRunId}}/steps/{{sftpStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmPrcRunId}}","steps","{{sftpStepDefId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "2.7 POST Upsert Step — ARCHIVE COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{gmPrcRunId}},\n  \"id_WorkflowStepDef\": {{archiveStepDefId}},\n  \"step_Kind\": \"ARCHIVE\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"archived:2:2025-01-02T08:00:15Z\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-02T08:00:12Z\",\n  \"end_Time\": \"2025-01-02T08:00:15Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmPrcRunId}}/steps/{{archiveStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmPrcRunId}}","steps","{{archiveStepDefId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "2.8 GET Batch Status — GM_PRC_DELIVERY",
+          "description": "Checks delivery status across all runs in the batch.\nBefore calling: set Batch_Key on the run in SSMS:\nUPDATE dbo.Pewo_WorkflowRun SET Batch_Key='2025-01-02' WHERE id_WorkflowRun={{gmPrcRunId}}\nExpected: array with one row showing Status=COMPLETED.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/PewoData/batch-status?workflowTypeCode=GM_PRC_DELIVERY&batchKey=2025-01-02",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","PewoData","batch-status"],
+              "query": [
+                { "key": "workflowTypeCode", "value": "GM_PRC_DELIVERY" },
+                { "key": "batchKey",         "value": "2025-01-02" }
+              ]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const batch = pm.response.json();",
+                "console.log('Batch status:', JSON.stringify(batch));"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "2.9 POST Set Run COMPLETED — GM_PRC_DELIVERY",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\",\n  \"reason\": null,\n  \"retry_At\": null,\n  \"retry_Count\": 0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmPrcRunId}}/status", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmPrcRunId}}","status"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "2.10 POST Advance Schedule — GM_PRC_DELIVERY",
+          "description": "Advances Next_Run_At to next 8AM UTC occurrence.\nExpected: HTTP 200.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"next_Run_At\": \"2025-01-03T08:00:00Z\",\n  \"last_Run_Id\": {{gmPrcRunId}},\n  \"last_Status\": \"COMPLETED\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/schedules/{{gmPrcScheduleId}}/advance", "host": ["{{baseUrl}}"], "path": ["api","PewoData","schedules","{{gmPrcScheduleId}}","advance"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "2.11 POST Insert Log — GM_PRC_DELIVERY Complete",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{gmPrcRunId}},\n  \"id_Customer\": {{idCustomer}},\n  \"customer_Name\": \"TARGET FLEXCOUNT\",\n  \"step_Kind\": null,\n  \"log_Level\": \"INFO\",\n  \"message\": \"GM_PRC_DELIVERY run COMPLETED — files zipped, delivered via SFTP, archived\",\n  \"event_Context\": \"{{eventGuid}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/logs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","logs"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "2.12 TEST Retry — Force Failure then Reset",
+          "description": "Tests retry/reset flow. Force SFTP to FAILED first by calling set status, then reset.\nStep 1: Call POST /runs/{{gmPrcRunId}}/status with status=FAILED\nStep 2: Call this request — POST /runs/{{gmPrcRunId}}/reset\nExpected: HTTP 200. Verify in SSMS: Status back to PENDING for FAILED steps only.",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "" },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{gmPrcRunId}}/reset", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{gmPrcRunId}}","reset"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        }
+
+      ]
+    },
+
+    {
+      "name": "3. Day 2 — MEO DAILY",
+      "description": "Simulates the MEO_DAILY 7AM UTC cron flow.\nSSMS before starting:\nUPDATE dbo.Pewo_Schedule SET Next_Run_At = DATEADD(MINUTE,-1,GETUTCDATE()) WHERE id_Schedule = {{meoDailyScheduleId}}",
+      "item": [
+
+        {
+          "name": "3.1 GET Due Jobs — Confirm MEO_DAILY Due",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/PewoData/due-jobs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","due-jobs"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const jobs = pm.response.json();",
+                "const meoJob = jobs.find(j => j.workflowType_Code === 'MEO_DAILY');",
+                "pm.test('MEO_DAILY is due', () => pm.expect(meoJob).to.not.be.undefined);",
+                "console.log('MEO_DAILY job:', JSON.stringify(meoJob));"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "3.2 POST Create WorkflowRun — MEO_DAILY",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_Schedule\": {{meoDailyScheduleId}},\n  \"id_CustomerWorkflowType\": {{meoDailyTypeId}},\n  \"max_Retries\": 3\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const runId = pm.response.json();",
+                "pm.expect(runId).to.be.above(0);",
+                "pm.collectionVariables.set('meoDailyRunId', runId);",
+                "console.log('MEO_DAILY RunId:', runId);"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "3.3 GET Run Resume — Load Steps for MEO_DAILY",
+          "description": "Expected: 5 steps — GET_EVENTS(1), TRANSFORM(2), READ_BLOB_ZIP(3), SFTP(4), EMAIL(5).\nCaptures all 5 step def IDs automatically.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/PewoData/runs/{{meoDailyRunId}}/resume?idCustomerWorkflowType={{meoDailyTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","PewoData","runs","{{meoDailyRunId}}","resume"],
+              "query": [{ "key": "idCustomerWorkflowType", "value": "{{meoDailyTypeId}}" }]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const steps = pm.response.json();",
+                "pm.test('5 steps returned', () => pm.expect(steps.length).to.equal(5));",
+                "const ge   = steps.find(s => s.step_Kind === 'GET_EVENTS');",
+                "const tr   = steps.find(s => s.step_Kind === 'TRANSFORM');",
+                "const rbz  = steps.find(s => s.step_Kind === 'READ_BLOB_ZIP');",
+                "const sftp = steps.find(s => s.step_Kind === 'SFTP');",
+                "const em   = steps.find(s => s.step_Kind === 'EMAIL');",
+                "if (ge)   pm.collectionVariables.set('meoGetEventsStepDefId',   ge.id_WorkflowStepDef);",
+                "if (tr)   pm.collectionVariables.set('meoTransformStepDefId',   tr.id_WorkflowStepDef);",
+                "if (rbz)  pm.collectionVariables.set('meoReadBlobZipStepDefId', rbz.id_WorkflowStepDef);",
+                "if (sftp) pm.collectionVariables.set('meoSftpStepDefId',        sftp.id_WorkflowStepDef);",
+                "if (em)   pm.collectionVariables.set('meoEmailStepDefId',       em.id_WorkflowStepDef);",
+                "pm.test('All 5 steps found', () => { pm.expect(ge).to.not.be.undefined; pm.expect(tr).to.not.be.undefined; pm.expect(rbz).to.not.be.undefined; pm.expect(sftp).to.not.be.undefined; pm.expect(em).to.not.be.undefined; });"
+              ]
+            }
+          }]
+        },
+
+        {
+          "name": "3.4 POST Upsert Step — GET_EVENTS COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{meoDailyRunId}},\n  \"id_WorkflowStepDef\": {{meoGetEventsStepDefId}},\n  \"step_Kind\": \"GET_EVENTS\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"discovered:3:2025-01-02\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-02T07:00:00Z\",\n  \"end_Time\": \"2025-01-02T07:00:02Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{meoDailyRunId}}/steps/{{meoGetEventsStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{meoDailyRunId}}","steps","{{meoGetEventsStepDefId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "3.5 POST Upsert Step — TRANSFORM COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{meoDailyRunId}},\n  \"id_WorkflowStepDef\": {{meoTransformStepDefId}},\n  \"step_Kind\": \"TRANSFORM\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"transformed:pewo/staging/{{meoDailyRunId}}/operation_1.dat,pewo/staging/{{meoDailyRunId}}/operation_2.dat\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-02T07:00:02Z\",\n  \"end_Time\": \"2025-01-02T07:00:08Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{meoDailyRunId}}/steps/{{meoTransformStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{meoDailyRunId}}","steps","{{meoTransformStepDefId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "3.6 POST Upsert Step — READ_BLOB_ZIP COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{meoDailyRunId}},\n  \"id_WorkflowStepDef\": {{meoReadBlobZipStepDefId}},\n  \"step_Kind\": \"READ_BLOB_ZIP\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"zip:pewo/staging/{{meoDailyRunId}}/delivery.zip\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-02T07:00:08Z\",\n  \"end_Time\": \"2025-01-02T07:00:14Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{meoDailyRunId}}/steps/{{meoReadBlobZipStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{meoDailyRunId}}","steps","{{meoReadBlobZipStepDefId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "3.7 POST Upsert Step — SFTP COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{meoDailyRunId}},\n  \"id_WorkflowStepDef\": {{meoSftpStepDefId}},\n  \"step_Kind\": \"SFTP\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"sftp:delivered:meo_delivery_{{meoDailyRunId}}.zip:2025-01-02T07:00:16Z\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-02T07:00:14Z\",\n  \"end_Time\": \"2025-01-02T07:00:18Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{meoDailyRunId}}/steps/{{meoSftpStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{meoDailyRunId}}","steps","{{meoSftpStepDefId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "3.8 POST Upsert Step — EMAIL COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{meoDailyRunId}},\n  \"id_WorkflowStepDef\": {{meoEmailStepDefId}},\n  \"step_Kind\": \"EMAIL\",\n  \"status\": \"COMPLETED\",\n  \"attempts\": 1,\n  \"artifact_Ref\": \"notified:2025-01-02T07:00:20Z\",\n  \"failure_Details\": null,\n  \"start_Time\": \"2025-01-02T07:00:18Z\",\n  \"end_Time\": \"2025-01-02T07:00:20Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{meoDailyRunId}}/steps/{{meoEmailStepDefId}}", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{meoDailyRunId}}","steps","{{meoEmailStepDefId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "3.9 POST Set Run COMPLETED — MEO_DAILY",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\",\n  \"reason\": null,\n  \"retry_At\": null,\n  \"retry_Count\": 0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/runs/{{meoDailyRunId}}/status", "host": ["{{baseUrl}}"], "path": ["api","PewoData","runs","{{meoDailyRunId}}","status"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "3.10 POST Advance Schedule — MEO_DAILY",
+          "description": "Advances to next 7AM UTC occurrence.\nExpected: HTTP 200.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"next_Run_At\": \"2025-01-03T07:00:00Z\",\n  \"last_Run_Id\": {{meoDailyRunId}},\n  \"last_Status\": \"COMPLETED\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/schedules/{{meoDailyScheduleId}}/advance", "host": ["{{baseUrl}}"], "path": ["api","PewoData","schedules","{{meoDailyScheduleId}}","advance"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+
+        {
+          "name": "3.11 POST Insert Log — MEO_DAILY Complete",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{meoDailyRunId}},\n  \"id_Customer\": {{idCustomer}},\n  \"customer_Name\": \"TARGET FLEXCOUNT\",\n  \"step_Kind\": null,\n  \"log_Level\": \"INFO\",\n  \"message\": \"MEO_DAILY run COMPLETED — events discovered, transformed, zipped, delivered, email sent\",\n  \"event_Context\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/PewoData/logs", "host": ["{{baseUrl}}"], "path": ["api","PewoData","logs"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        }
+
+      ]
+    },
+
+    {
+      "name": "4. SSMS Verification Queries (reference)",
+      "description": "These are not API calls — copy these queries into SSMS to verify DB state after each folder.\n\n-- Full run audit:\nSELECT wr.id_WorkflowRun, cwt.WorkflowType_Code, wr.Status, wr.Started_At, wr.Finished_At,\n       wsr.Step_Kind, wsr.Status AS StepStatus, wsr.Attempts, LEFT(wsr.Artifact_Ref,60) AS ArtifactRef\nFROM   dbo.Pewo_WorkflowRun wr\nJOIN   dbo.Pewo_CustomerWorkflowType cwt ON cwt.id_CustomerWorkflowType = wr.id_CustomerWorkflowType\nLEFT JOIN dbo.Pewo_WorkflowStepRun wsr ON wsr.id_WorkflowRun = wr.id_WorkflowRun\nWHERE  cwt.id_Customer = 47\nORDER  BY wr.id_WorkflowRun DESC, wsr.Step_Kind;\n\n-- Schedule state:\nSELECT s.id_Schedule, cwt.WorkflowType_Code, s.Next_Run_At, s.Last_Run_Id, s.Last_Status\nFROM   dbo.Pewo_Schedule s\nJOIN   dbo.Pewo_CustomerWorkflowType cwt ON cwt.id_CustomerWorkflowType = s.id_CustomerWorkflowType\nWHERE  cwt.id_Customer = 47\nORDER  BY cwt.WorkflowType_Code;\n\n-- Logs:\nSELECT TOP 30 * FROM dbo.Pewo_WorkflowRunLog ORDER BY logged_date DESC;",
+      "item": []
+    }
+
+  ]
+}
