@@ -1,0 +1,325 @@
+{
+  "info": {
+    "name": "PEWO — Web REST API (localhost:7200)",
+    "description": "End-to-end testing for PEWO Web REST API.\n\nBASE URL: https://localhost:7200\nX-Api-Key: YOUR_LOCAL_TEST_KEY_123\n\nFLOW:\n1. Run 01_Event_Close folder — simulates UI event close (Postman, once)\n2. Run 02_Worker_Run folder — simulates Container App Job tick (or use PowerShell loop)\n3. Advance GM_PRC_DELIVERY Next_Run_At in SSMS\n4. Run 02_Worker_Run again — Day 2 fires automatically\n\nPOWERSHELL LOOP (keep running alongside):\nwhile ($true) { Invoke-RestMethod -Method POST -Uri 'https://localhost:7200/api/Pewo/worker/run' -Headers @{'X-Api-Key'='YOUR_LOCAL_TEST_KEY_123'} -SkipCertificateCheck; Start-Sleep -Seconds 30 }",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",    "value": "https://localhost:7200", "type": "string" },
+    { "key": "apiKey",     "value": "YOUR_LOCAL_TEST_KEY_123", "type": "string" },
+    { "key": "idCustomer", "value": "47",                     "type": "string" },
+    { "key": "idEvent",    "value": "5001",                   "type": "string", "description": "Replace with your real dev event id" },
+    { "key": "eventGuid",  "value": "REPLACE_WITH_REAL_EVENT_GUID", "type": "string", "description": "Replace with real event guid from dbo.Event" },
+    { "key": "storeNo",    "value": "0421",                   "type": "string" },
+    { "key": "workerRunId","value": "",                        "type": "string", "description": "Captured from event-close response" },
+    { "key": "stepRunId",  "value": "",                        "type": "string", "description": "Captured from worker run" }
+  ],
+  "item": [
+
+    {
+      "name": "01 — Day 1: Event Close (simulates UI closing event)",
+      "description": "Call this ONCE from Postman — this is what your EventService.CloseEventAsync will do automatically in prod.\nReplace eventGuid with a real closed event from dev:\nSELECT TOP 1 id_Event, Event_Guid FROM dbo.Event WHERE id_Customer=47 AND Status='Closed' ORDER BY id_Event DESC",
+      "item": [
+        {
+          "name": "1.1 POST event-close — Prime GM_TOTALS_CHECK",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_Customer\": {{idCustomer}},\n  \"id_Event\": {{idEvent}},\n  \"store_No\": \"{{storeNo}}\",\n  \"store_Name\": \"Target Allen TX\",\n  \"event_Date\": \"2025-01-01T23:00:00Z\",\n  \"workflowType_Code\": \"GM_TOTALS_CHECK\",\n  \"event_Guid\": \"{{eventGuid}}\",\n  \"id_Store\": 5,\n  \"event_Status\": \"CLOSED\",\n  \"event_Scheduled_Date\": \"2025-01-01T06:00:00Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/event-close", "host": ["{{baseUrl}}"], "path": ["api","Pewo","event-close"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const result = pm.response.json();",
+                "pm.test('Runs created', () => pm.expect(result).to.be.an('array').with.length.above(0));",
+                "if (result.length > 0) {",
+                "  pm.collectionVariables.set('workerRunId', result[0].id_WorkflowRun);",
+                "  console.log('WorkflowRun created:', result[0].id_WorkflowRun, result[0].workflowType_Code);",
+                "}",
+                "console.log('NEXT: Verify in SSMS then call 02 Worker Run (or let PowerShell loop fire it)');"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "1.2 SSMS verify — confirm WorkflowRun created",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/Pewo/worker/run", "host": ["{{baseUrl}}"], "path": ["api","Pewo","worker","run"] },
+            "description": "NOT a real request — paste this in SSMS to confirm:\n\nSELECT wr.id_WorkflowRun, cwt.WorkflowType_Code, wr.Status,\n       wre.Event_Guid, wre.Store_No, s.Next_Run_At\nFROM   dbo.Pewo_WorkflowRun wr\nJOIN   dbo.Pewo_CustomerWorkflowType cwt ON cwt.id_CustomerWorkflowType = wr.id_CustomerWorkflowType\nJOIN   dbo.Pewo_WorkflowRunEvent wre ON wre.id_WorkflowRun = wr.id_WorkflowRun\nJOIN   dbo.Pewo_Schedule s ON s.id_Schedule = wr.id_Schedule\nORDER  BY wr.id_WorkflowRun DESC;"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "02 — Worker Run (simulates Container App Job POST)",
+      "description": "This is what the Container App Job sends every 10 min in production.\nLocally: call manually from Postman OR use the PowerShell loop.\nProtected by X-Api-Key header.",
+      "item": [
+        {
+          "name": "2.1 POST worker/run — fire job loop",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Api-Key",    "value": "{{apiKey}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/Pewo/worker/run", "host": ["{{baseUrl}}"], "path": ["api","Pewo","worker","run"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const r = pm.response.json();",
+                "pm.test('Response has job counts', () => pm.expect(r).to.have.property('jobsProcessed'));",
+                "console.log(`Jobs: ${r.jobsProcessed} | OK: ${r.jobsSucceeded} | Failed: ${r.jobsFailed} | ${r.durationMs}ms`);",
+                "if (r.jobsSucceeded > 0) console.log('SUCCESS — check SSMS for step results');",
+                "if (r.jobsFailed > 0)   console.log('FAILURE — check Pewo_WorkflowRunLog for details');"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "2.2 POST worker/run — 401 test (no key)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/Pewo/worker/run", "host": ["{{baseUrl}}"], "path": ["api","Pewo","worker","run"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('401 when no key', () => pm.response.to.have.status(401));"] } }]
+        },
+        {
+          "name": "2.3 POST worker/run — 401 test (wrong key)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Api-Key",    "value": "WRONG_KEY_123" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/Pewo/worker/run", "host": ["{{baseUrl}}"], "path": ["api","Pewo","worker","run"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('401 when wrong key', () => pm.response.to.have.status(401));"] } }]
+        }
+      ]
+    },
+
+    {
+      "name": "03 — Individual Step Testing (Day 1)",
+      "description": "Test each Day 1 step individually. Set breakpoints in PewoStepService.cs before calling.",
+      "item": [
+        {
+          "name": "3.1 POST steps/totals-check",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{workerRunId}},\n  \"id_WorkflowStepDef\": 1,\n  \"step_Kind\": \"TOTALS_CHECK\",\n  \"event_Guid\": \"{{eventGuid}}\",\n  \"attempts\": 1,\n  \"max_Attempts\": 3,\n  \"store_No\": \"{{storeNo}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/steps/totals-check", "host": ["{{baseUrl}}"], "path": ["api","Pewo","steps","totals-check"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const r = pm.response.json();",
+                "console.log('Success:', r.success, '| ArtifactRef:', r.artifact_Ref);",
+                "if (!r.success) console.error('FAILED:', r.failure_Details);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "3.2 POST steps/email (notification)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{workerRunId}},\n  \"id_WorkflowStepDef\": 2,\n  \"step_Kind\": \"EMAIL\",\n  \"config\": \"{\\\"recipients\\\":\\\"your.real@email.com\\\",\\\"subject\\\":\\\"PEWO Test — Totals Check Passed\\\"}\",\n  \"attempts\": 1,\n  \"max_Attempts\": 3,\n  \"event_Guid\": \"{{eventGuid}}\",\n  \"store_No\": \"{{storeNo}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/steps/email", "host": ["{{baseUrl}}"], "path": ["api","Pewo","steps","email"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const r = pm.response.json();",
+                "console.log('Email sent:', r.success, '| ArtifactRef:', r.artifact_Ref);"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "04 — Individual Step Testing (Day 2 NGen)",
+      "description": "Test Day 2 steps individually.\nPre-condition: a WorkflowRun for GM_PRC_DELIVERY must exist with Event_Guid pointing to real blobs.\nSet breakpoints in PewoStepService.cs before calling each step.\n\nSSMS — advance Day 2 schedule first:\nUPDATE s SET s.Next_Run_At = DATEADD(MINUTE,-1,GETUTCDATE())\nFROM dbo.Pewo_Schedule s JOIN dbo.Pewo_CustomerWorkflowType cwt ON cwt.id_CustomerWorkflowType=s.id_CustomerWorkflowType\nWHERE cwt.WorkflowType_Code='GM_PRC_DELIVERY' AND cwt.id_Customer=47",
+      "item": [
+        {
+          "name": "4.1 POST steps/read-blob-zip",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{workerRunId}},\n  \"id_WorkflowStepDef\": 1,\n  \"step_Kind\": \"READ_BLOB_ZIP\",\n  \"config\": \"{\\\"sourceContainer\\\":\\\"output-files\\\",\\\"stagingContainer\\\":\\\"flexcount-save\\\"}\",\n  \"event_Guid\": \"{{eventGuid}}\",\n  \"store_No\": \"{{storeNo}}\",\n  \"attempts\": 1,\n  \"max_Attempts\": 3\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/steps/read-blob-zip", "host": ["{{baseUrl}}"], "path": ["api","Pewo","steps","read-blob-zip"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const r = pm.response.json();",
+                "console.log('ReadBlobZip:', r.success, '| Files:', r.artifact_Ref);",
+                "if (r.success && r.artifact_Ref) {",
+                "  pm.collectionVariables.set('stagedArtifactRef', r.artifact_Ref);",
+                "  console.log('Staged artifact captured for SFTP step');",
+                "}",
+                "if (!r.success) console.error('FAILED:', r.failure_Details);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "4.2 POST steps/sftp",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{workerRunId}},\n  \"id_WorkflowStepDef\": 2,\n  \"step_Kind\": \"SFTP\",\n  \"config\": \"{\\\"remotePath\\\":\\\"/www.data/target-ssh/nexgen\\\",\\\"stagingContainer\\\":\\\"flexcount-save\\\"}\",\n  \"artifact_Ref\": \"{{stagedArtifactRef}}\",\n  \"event_Guid\": \"{{eventGuid}}\",\n  \"store_No\": \"{{storeNo}}\",\n  \"attempts\": 1,\n  \"max_Attempts\": 3\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/steps/sftp", "host": ["{{baseUrl}}"], "path": ["api","Pewo","steps","sftp"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const r = pm.response.json();",
+                "console.log('SFTP:', r.success, '| Delivered:', r.artifact_Ref);",
+                "if (!r.success) console.error('FAILED:', r.failure_Details);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "4.3 POST steps/archive",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{workerRunId}},\n  \"id_WorkflowStepDef\": 3,\n  \"step_Kind\": \"ARCHIVE\",\n  \"config\": \"{\\\"sourceContainer\\\":\\\"output-files\\\",\\\"archiveContainer\\\":\\\"flexcount-save\\\"}\",\n  \"event_Guid\": \"{{eventGuid}}\",\n  \"store_No\": \"{{storeNo}}\",\n  \"attempts\": 1,\n  \"max_Attempts\": 3\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/steps/archive", "host": ["{{baseUrl}}"], "path": ["api","Pewo","steps","archive"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const r = pm.response.json();",
+                "console.log('Archive:', r.success, '| Count:', r.artifact_Ref);",
+                "if (!r.success) console.error('FAILED:', r.failure_Details);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "4.4 POST steps/email-summary (consolidated ack)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{workerRunId}},\n  \"id_WorkflowStepDef\": 1,\n  \"step_Kind\": \"EMAIL_SUMMARY\",\n  \"config\": \"{\\\"batchWorkflowTypeCode\\\":\\\"GM_PRC_DELIVERY\\\",\\\"recipients\\\":\\\"your.real@email.com\\\",\\\"subject\\\":\\\"TARGET GM + PRPC Delivery Summary\\\"}\",\n  \"attempts\": 1,\n  \"max_Attempts\": 6\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/steps/email-summary", "host": ["{{baseUrl}}"], "path": ["api","Pewo","steps","email-summary"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const r = pm.response.json();",
+                "console.log('EmailSummary:', r.success, '|', r.artifact_Ref ?? r.failure_Details);"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "05 — Manual Retry",
+      "description": "When a run is stuck in FAILED state, call this to reset FAILED steps to PENDING.\nWorker picks it up on the next tick.",
+      "item": [
+        {
+          "name": "5.1 POST runs/{id}/retry",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/Pewo/runs/{{workerRunId}}/retry", "host": ["{{baseUrl}}"], "path": ["api","Pewo","runs","{{workerRunId}}","retry"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "console.log('Run reset to PENDING. Call worker/run to process.');"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "06 — MEO Stubs (for reference)",
+      "description": "MEO steps are stubbed pending file location confirmation. These calls will return success stubs.",
+      "item": [
+        {
+          "name": "6.1 POST steps/get-events (MEO stub)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{workerRunId}},\n  \"id_WorkflowStepDef\": 1,\n  \"step_Kind\": \"GET_EVENTS\",\n  \"config\": \"{\\\"sourceContainer\\\":\\\"fc-hold-target\\\",\\\"filePattern\\\":\\\"MEO_\\\"}\",\n  \"attempts\": 1,\n  \"max_Attempts\": 3\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/steps/get-events", "host": ["{{baseUrl}}"], "path": ["api","Pewo","steps","get-events"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "6.2 POST steps/transform (MEO stub)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_WorkflowRun\": {{workerRunId}},\n  \"id_WorkflowStepDef\": 2,\n  \"step_Kind\": \"TRANSFORM\",\n  \"config\": \"{\\\"transformationType\\\":\\\"MEO\\\"}\",\n  \"attempts\": 1,\n  \"max_Attempts\": 3\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/Pewo/steps/transform", "host": ["{{baseUrl}}"], "path": ["api","Pewo","steps","transform"] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        }
+      ]
+    }
+  ]
+}
