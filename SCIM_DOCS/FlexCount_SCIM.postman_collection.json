@@ -1,0 +1,2165 @@
+{
+  "info": {
+    "_postman_id": "45121977-8c3b-485b-8d93-c689748562d2",
+    "name": "FlexCount SCIM API",
+    "description": "Test collection for the FlexCount SCIM API (repo: WIS_SCIMApp_RestAPI).\n\nSETUP\n1. Import an environment file from the same folder.\n2. Fill in `scim_token` yourself \u2014 it ships blank on purpose. Get it from Key Vault, secret name `ScimToken`, in that environment's vault.\n3. Do NOT commit a real token back into the environment file.\n\nORDER\nRun folders top to bottom. The create tests make the users the update tests need.\n\nEXPECTATIONS\nEvery expectation here was verified against the code, not against the older Word test guides \u2014 those are out of date and contradict each other.\nWhere the code does something surprising, the test says so and points at a gap ID in docs/06-known-gaps.md.\n\nMOST IMPORTANT TESTS\n- TC-N2: proves the region guard works. If it fails, stop and escalate.\n- TC-N1: the only test that exercises region de-duplication.\n- TC-18a/b/c: Entra Test Connection. Any failure blocks all provisioning.\n\nSee docs/04-testing.md for full detail and the SQL to verify each case.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 - Discovery (no auth)",
+      "item": [
+        {
+          "name": "Health check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "*/*"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/HealthCheck",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "HealthCheck"
+              ]
+            },
+            "description": "Anonymous. No auth needed."
+          },
+          "response": []
+        },
+        {
+          "name": "ServiceProviderConfig",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"patch supported\", () => pm.expect(pm.response.json().patch.supported).to.be.true);",
+                  "// NOTE: advertises etag.supported = true, but meta.version is always W/\"\" \u2014 gap G-04/G-05"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/ServiceProviderConfig",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "ServiceProviderConfig"
+              ]
+            },
+            "description": "Anonymous by design \u2014 Entra reads this before authenticating."
+          },
+          "response": []
+        },
+        {
+          "name": "ResourceTypes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/ResourceTypes",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "ResourceTypes"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Schemas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Schemas",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Schemas"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ],
+      "description": "Entra reads these before authenticating. They must work anonymously."
+    },
+    {
+      "name": "01 - Create",
+      "item": [
+        {
+          "name": "TC-01 Create Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Location header present\", () => pm.expect(pm.response.headers.has(\"Location\")).to.be.true);",
+                  "const j = pm.response.json();",
+                  "pm.test(\"userName echoed\", () => pm.expect(j.userName).to.eql(pm.environment.get(\"admin_email\")));",
+                  "pm.test(\"active true\", () => pm.expect(j.active).to.be.true);",
+                  "// DB: Id_Role = 1, Feature 23 -> Permission 6, Feature 24 -> Permission 6, no User_Region rows",
+                  "// KNOWN GAP G-03: roles[0].value comes back as \"\" not \"Admin\"",
+                  "pm.test(\"roles[0].value is empty (known gap G-03)\", () => pm.expect(j.roles[0].value).to.eql(\"\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ]
+            },
+            "description": "Creates an Admin. Verify in DB: Id_Role=1, Feature 24 enabled (Permission 6), no regions.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:schemas:core:2.0:User\"\n  ],\n  \"userName\": \"{{admin_email}}\",\n  \"name\": {\n    \"givenName\": \"John\",\n    \"familyName\": \"Smith\"\n  },\n  \"emails\": [\n    {\n      \"value\": \"{{admin_email}}\",\n      \"type\": \"work\",\n      \"primary\": \"true\"\n    }\n  ],\n  \"active\": true,\n  \"roles\": [\n    {\n      \"value\": \"APP-FlexCount-Corporate-User-HQ-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Corporate-User-HQ-{{env_suffix}}\",\n      \"primary\": \"false\"\n    }\n  ],\n  \"phoneNumbers\": [\n    {\n      \"value\": \"1-612-619-0001\",\n      \"type\": \"mobile\",\n      \"primary\": \"true\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-02 Create Corporate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Location header present\", () => pm.expect(pm.response.headers.has(\"Location\")).to.be.true);",
+                  "// DB: Id_Role = 2 (NOT 1). This is the HQ prefix-collision test.",
+                  "// If Id_Role comes back as 1, the HQ check order in ResolveRoles has been broken.",
+                  "// DB: Feature 23 -> Permission 6, Feature 24 -> Permission 7 (disabled)"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ]
+            },
+            "description": "Corporate, not Admin. Corporate-User- is a prefix of Corporate-User-HQ- so order matters.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:schemas:core:2.0:User\"\n  ],\n  \"userName\": \"{{corporate_email}}\",\n  \"name\": {\n    \"givenName\": \"Jane\",\n    \"familyName\": \"Doe\"\n  },\n  \"emails\": [\n    {\n      \"value\": \"{{corporate_email}}\",\n      \"type\": \"work\",\n      \"primary\": \"true\"\n    }\n  ],\n  \"active\": true,\n  \"roles\": [\n    {\n      \"value\": \"APP-FlexCount-Corporate-User-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Corporate-User-{{env_suffix}}\",\n      \"primary\": \"false\"\n    }\n  ],\n  \"phoneNumbers\": [\n    {\n      \"value\": \"1-612-619-0002\",\n      \"type\": \"mobile\",\n      \"primary\": \"true\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-03 Create Regional (Group195)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Location header present\", () => pm.expect(pm.response.headers.has(\"Location\")).to.be.true);",
+                  "// DB: Id_Role = 3",
+                  "// DB: 7 User_Region rows -> (1,100) (2,195) (3,134) (3,137) (3,138) (4,42) (4,63)",
+                  "// DB: Primary_Phone = 1-612-619-0003 (the mobile \u2014 because primary:true decides on CREATE)",
+                  "// DB: Secondary_Phone = 1-612-619-0004",
+                  "// NOTE: on PATCH the buckets are decided by type, not the flag. See gap G-07."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ]
+            },
+            "description": "Regional with one group. Regions come from the DB via SearchCustomerGroups.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:schemas:core:2.0:User\"\n  ],\n  \"userName\": \"{{regional_email}}\",\n  \"name\": {\n    \"givenName\": \"Bob\",\n    \"familyName\": \"Regional\"\n  },\n  \"emails\": [\n    {\n      \"value\": \"{{regional_email}}\",\n      \"type\": \"work\",\n      \"primary\": \"true\"\n    }\n  ],\n  \"active\": true,\n  \"roles\": [\n    {\n      \"value\": \"APP-FlexCount-Group195-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Group195-{{env_suffix}}\",\n      \"primary\": \"false\"\n    }\n  ],\n  \"phoneNumbers\": [\n    {\n      \"value\": \"1-612-619-0003\",\n      \"type\": \"mobile\",\n      \"primary\": \"true\"\n    },\n    {\n      \"value\": \"1-612-619-0004\",\n      \"type\": \"work\",\n      \"primary\": \"false\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Update",
+      "item": [
+        {
+          "name": "TC-04 Update name + phone (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"givenName updated\", () => pm.expect(j.name.givenName).to.eql(\"Jonathan\"));",
+                  "// DB: Primary_Phone = 1-612-619-9001 (the WORK one \u2014 PATCH uses type)",
+                  "// KNOWN GAP G-07: Primary_Phone_Type is NOT updated. Stays whatever it was."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{admin_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{admin_email_enc}}"
+              ]
+            },
+            "description": "Name + phone only. Role and status must not change.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"name.givenName\",\n      \"value\": \"Jonathan\"\n    },\n    {\n      \"op\": \"replace\",\n      \"path\": \"name.familyName\",\n      \"value\": \"Smithson\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"phoneNumbers[type eq \\\"work\\\"].value\",\n      \"value\": \"1-612-619-9001\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"phoneNumbers[type eq \\\"mobile\\\"].value\",\n      \"value\": \"1-612-619-9002\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-05 Corporate -> Regional (394)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// DB: Id_Role 2 -> 3",
+                  "// DB: 12 region rows -> (1,300) (2,394) (3,334) (3,335) (3,336) (3,346) (3,369)",
+                  "//                       (4,32) (4,33) (4,34) (4,47) (4,71)",
+                  "// This also proves stringified-JSON role parsing works.",
+                  "// A 400 here means the TrimStart().StartsWith(\"{\") block in ResolveRoles is broken."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{corporate_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{corporate_email_enc}}"
+              ]
+            },
+            "description": "Stringified JSON role format \u2014 this is what Entra actually sends on PATCH.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Group394-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group394-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-06 Regional 195 -> 394",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// DB: 195 regions gone, 394 regions in place. Full replace, not merge."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "Group change. AddOrUpdateUserRegions is wipe-and-replace.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Group394-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group394-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Deactivate / Reactivate",
+      "item": [
+        {
+          "name": "TC-07 Deactivate Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"active false\", () => pm.expect(pm.response.json().active).to.be.false);",
+                  "// DB: Status = Inactive, User_Role_Customer_Link.Is_Active = 0",
+                  "// DB: user row, regions and permissions ALL preserved",
+                  "// KNOWN GAP G-06: response body has empty name and role \u2014 it is a throwaway object"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{admin_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{admin_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"active\",\n      \"value\": \"false\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-08 Deactivate Corporate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{corporate_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{corporate_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"active\",\n      \"value\": \"false\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-09 Deactivate Regional",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"active\",\n      \"value\": \"false\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-10 Reactivate Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"active true\", () => pm.expect(pm.response.json().active).to.be.true);",
+                  "// DB: Status back to Active, Is_Active back to 1, NO duplicate row",
+                  "// Order matters: if active:false appears anywhere the deactivate branch wins."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{admin_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{admin_email_enc}}"
+              ]
+            },
+            "description": "active + roles together, in one PATCH. This is what Entra sends on reassignment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"active\",\n      \"value\": \"true\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Corporate-User-HQ-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Corporate-User-HQ-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-11 Reactivate Corporate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{corporate_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{corporate_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"active\",\n      \"value\": \"true\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Corporate-User-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Corporate-User-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-12 Reactivate Regional",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"active\",\n      \"value\": \"true\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Role transitions",
+      "item": [
+        {
+          "name": "TC-13 Admin -> Corporate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// DB: Id_Role 1 -> 2, Feature 24 goes Permission 6 -> 7"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{admin_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{admin_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Corporate-User-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Corporate-User-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-14 Corporate -> Regional (398)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// DB: Id_Role -> 3, regions (1,300) (2,398) (3,340) (4,47)"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{corporate_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{corporate_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Group398-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group398-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-15 Regional -> Corporate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// DB: Id_Role 3 -> 2, ALL User_Region rows deleted",
+                  "// This is the case where the region guard does NOT fire \u2014 correct, because",
+                  "// the user is no longer Regional so empty regions mean wipe. Compare TC-N2."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Corporate-User-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Corporate-User-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-16 Corporate -> Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// DB: Id_Role 2 -> 1, Feature 24 goes Permission 7 -> 6"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{corporate_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{corporate_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Corporate-User-HQ-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Corporate-User-HQ-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Multi-operation PATCH",
+      "item": [
+        {
+          "name": "TC-17 Multi-op: name + phone + role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// ApplyPatch builds ONE update object from all 4 ops and sends one PUT.",
+                  "// There is no way to half-apply it."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{admin_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{admin_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"name.givenName\",\n      \"value\": \"Updated\"\n    },\n    {\n      \"op\": \"replace\",\n      \"path\": \"name.familyName\",\n      \"value\": \"Name\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"phoneNumbers[type eq \\\"work\\\"].value\",\n      \"value\": \"1-612-619-7777\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-17b Multi-op: name + phone + two Regional groups",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// DB: merged regions from 195 + 394 (19 rows)",
+                  "// The two Entra id GUIDs are parsed and discarded \u2014 ScimRole has no Id property."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"name.givenName\",\n      \"value\": \"Updated\"\n    },\n    {\n      \"op\": \"replace\",\n      \"path\": \"name.familyName\",\n      \"value\": \"Regional\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"phoneNumbers[type eq \\\"work\\\"].value\",\n      \"value\": \"1-612-619-8001\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"phoneNumbers[type eq \\\"mobile\\\"].value\",\n      \"value\": \"1-612-619-8002\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\"}\"\n        },\n        {\n          \"value\": \"{\\\"id\\\": \\\"178321e0-e22a-41b3-b00f-bdbbdd4505ed\\\", \\\"value\\\": \\\"APP-FlexCount-Group394-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group394-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Multi-role",
+      "item": [
+        {
+          "name": "TC-21 Create Admin + Corporate (Admin wins)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Location header present\", () => pm.expect(pm.response.headers.has(\"Location\")).to.be.true);",
+                  "// DB: Id_Role = 1. Corporate silently ignored.",
+                  "// primary is NOT read \u2014 swap the flags and the answer is the same."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:schemas:core:2.0:User\"\n  ],\n  \"userName\": \"{{multi_admin_email}}\",\n  \"name\": {\n    \"givenName\": \"Alex\",\n    \"familyName\": \"MultiRole\"\n  },\n  \"emails\": [\n    {\n      \"value\": \"{{multi_admin_email}}\",\n      \"type\": \"work\",\n      \"primary\": \"true\"\n    }\n  ],\n  \"active\": true,\n  \"roles\": [\n    {\n      \"value\": \"APP-FlexCount-Corporate-User-HQ-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Corporate-User-HQ-{{env_suffix}}\",\n      \"primary\": \"true\"\n    },\n    {\n      \"value\": \"APP-FlexCount-Corporate-User-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Corporate-User-{{env_suffix}}\",\n      \"primary\": \"false\"\n    }\n  ],\n  \"phoneNumbers\": [\n    {\n      \"value\": \"1-612-619-2100\",\n      \"type\": \"mobile\",\n      \"primary\": \"true\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-22 Create Corporate + Regional (Corporate wins)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Location header present\", () => pm.expect(pm.response.headers.has(\"Location\")).to.be.true);",
+                  "// DB: Id_Role = 2, NO regions.",
+                  "// CHECK THE TRACE: SearchCustomerGroups must NOT be called.",
+                  "// If it is, the priority logic has regressed."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:schemas:core:2.0:User\"\n  ],\n  \"userName\": \"{{multi_corporate_email}}\",\n  \"name\": {\n    \"givenName\": \"Casey\",\n    \"familyName\": \"Priority\"\n  },\n  \"emails\": [\n    {\n      \"value\": \"{{multi_corporate_email}}\",\n      \"type\": \"work\",\n      \"primary\": \"true\"\n    }\n  ],\n  \"active\": true,\n  \"roles\": [\n    {\n      \"value\": \"APP-FlexCount-Corporate-User-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Corporate-User-{{env_suffix}}\",\n      \"primary\": \"true\"\n    },\n    {\n      \"value\": \"APP-FlexCount-Group195-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Group195-{{env_suffix}}\",\n      \"primary\": \"false\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-23 Create two Regional groups (195 + 394)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Location header present\", () => pm.expect(pm.response.headers.has(\"Location\")).to.be.true);",
+                  "// DB: 19 region rows.",
+                  "//   R1: 100, 300",
+                  "//   R2: 195, 394",
+                  "//   R3: 134,137,138,334,335,336,346,369",
+                  "//   R4: 42,63,32,33,34,47,71",
+                  "// ONE SearchCustomerGroups call with both names, not two calls.",
+                  "// Do NOT assert ordering \u2014 the SQL has no ORDER BY. Assert the set."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:schemas:core:2.0:User\"\n  ],\n  \"userName\": \"{{multi_regional_email}}\",\n  \"name\": {\n    \"givenName\": \"Jordan\",\n    \"familyName\": \"MultiGroup\"\n  },\n  \"emails\": [\n    {\n      \"value\": \"{{multi_regional_email}}\",\n      \"type\": \"work\",\n      \"primary\": \"true\"\n    }\n  ],\n  \"active\": true,\n  \"roles\": [\n    {\n      \"value\": \"APP-FlexCount-Group195-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Group195-{{env_suffix}}\",\n      \"primary\": \"true\"\n    },\n    {\n      \"value\": \"APP-FlexCount-Group394-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Group394-{{env_suffix}}\",\n      \"primary\": \"false\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-24 Add a second group to an existing Regional user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// Entra sends the FULL desired state, not a delta. Both groups.",
+                  "// DB: same 19 rows as TC-23."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"phoneNumbers[type eq \\\"work\\\"].value\",\n      \"value\": \"1-612-619-9999\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"phoneNumbers[type eq \\\"mobile\\\"].value\",\n      \"value\": \"1-612-619-9999\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\"}\"\n        },\n        {\n          \"value\": \"{\\\"id\\\": \\\"178321e0-e22a-41b3-b00f-bdbbdd4505ed\\\", \\\"value\\\": \\\"APP-FlexCount-Group394-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group394-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-25 Remove one group from a dual-group user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// Entra sends only the REMAINING group.",
+                  "// DB: back to 7 rows. Group394 values gone entirely.",
+                  "// Proves AddOrUpdateUserRegions is wipe-and-replace, not additive."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"0efbaeb9-bac6-4e58-908b-1b55278c0a9f\\\", \\\"value\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group195-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 - Negative and probes",
+      "item": [
+        {
+          "name": "TC-18a Probe - userName eq GUID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"totalResults 0\", () => pm.expect(j.totalResults).to.eql(0));",
+                  "pm.test(\"Resources empty\", () => pm.expect(j.Resources).to.be.an(\"array\").that.is.empty);",
+                  "// This one DOES hit the Customer API. It works because IsEmailValidOrGuid() accepts a GUID.",
+                  "// Any error here blocks Entra provisioning entirely."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users?filter=userName eq \"de849d81-1aed-4721-8345-f554005c5000\"",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "userName eq \"de849d81-1aed-4721-8345-f554005c5000\""
+                }
+              ]
+            },
+            "description": "Entra Test Connection. MUST return 200 + empty list."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-18b Probe - externalId eq GUID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"totalResults 0\", () => pm.expect(pm.response.json().totalResults).to.eql(0));",
+                  "// Short-circuits \u2014 no downstream call."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users?filter=externalId eq \"f1ada000-b1e8-4691-80a2-c558210ad387\"",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "externalId eq \"f1ada000-b1e8-4691-80a2-c558210ad387\""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "TC-18c Probe - id eq GUID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"totalResults 0\", () => pm.expect(pm.response.json().totalResults).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users?filter=id eq \"de849d81-1aed-4721-8345-f554005c5000\"",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "id eq \"de849d81-1aed-4721-8345-f554005c5000\""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "TC-19 Invalid token -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "// Log line: SCIM_AUDIT event=AuthFailed reason=InvalidToken",
+                  "// Nothing downstream runs."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer INVALID_TOKEN_FOR_TC19"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users?filter=userName eq \"de849d81-1aed-4721-8345-f554005c5000\"",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "userName eq \"de849d81-1aed-4721-8345-f554005c5000\""
+                }
+              ]
+            },
+            "description": "Deliberately wrong token."
+          },
+          "response": []
+        },
+        {
+          "name": "TC-20 Invalid role on create -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"detail matches code\", () => pm.expect(j.detail).to.eql(\"Error resolving roles: No valid entitlement roles found.\"));",
+                  "pm.test(\"scimType is invalidRoles (known gap G-18)\", () => pm.expect(j.scimType).to.eql(\"invalidRoles\"));",
+                  "// RFC 7644 says this should be invalidValue. Entra only reads the status code.",
+                  "// NO user is created \u2014 ResolveRoles runs before the dup check and before any write."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:schemas:core:2.0:User\"\n  ],\n  \"userName\": \"test.invalid@target.com\",\n  \"active\": true,\n  \"roles\": [\n    {\n      \"value\": \"INVALID-ROLE-VALUE\",\n      \"primary\": \"false\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-26 Empty roles array on patch -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"detail matches code exactly (typo included)\", () =>",
+                  "  pm.expect(j.detail).to.eql(\"Role validation failed: No valid entitlement roles found in the provided in roles array.\"));",
+                  "// Yes, \"in the provided in roles array\" \u2014 the message has a typo. Matched exactly on purpose.",
+                  "// The user must be unchanged."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": []\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-27 Unrecognised role + name change -> 400, nothing applied",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"detail matches code\", () => pm.expect(j.detail).to.eql(\"Role validation failed: No valid entitlement roles found.\"));",
+                  "// VERIFY IN DB: givenName is NOT \"ShouldNotUpdate\".",
+                  "// Atomicity comes from the controller returning early, not from a transaction."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"name.givenName\",\n      \"value\": \"ShouldNotUpdate\"\n    },\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"abc123\\\", \\\"value\\\": \\\"APP-UnknownSystem-SomeRole-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-UnknownSystem-SomeRole-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unsupported filter -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"scimType invalidFilter\", () => pm.expect(pm.response.json().scimType).to.eql(\"invalidFilter\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users?filter=displayName eq \"x\"",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "displayName eq \"x\""
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "08 - Extra cases (not in the old guides)",
+      "item": [
+        {
+          "name": "TC-N1 Merge two OVERLAPPING groups (394 + 398)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Location header present\", () => pm.expect(pm.response.headers.has(\"Location\")).to.be.true);",
+                  "// WHY THIS EXISTS:",
+                  "// Every other multi-group test uses 195 + 394, which have ZERO overlap.",
+                  "// So the de-duplication code has never once been exercised.",
+                  "// 394 and 398 BOTH contain region 300 and market 47.",
+                  "//",
+                  "// DB expectation \u2014 each value appears ONCE:",
+                  "//   R1: 300            (once, not twice)",
+                  "//   R2: 394, 398",
+                  "//   R3: 334,335,336,346,369,340",
+                  "//   R4: 32,33,34,47,71 (47 once, not twice)",
+                  "//",
+                  "// Duplicates here mean MergeRegions GroupBy has broken."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users"
+              ]
+            },
+            "description": "The only test that exercises region de-duplication.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:schemas:core:2.0:User\"\n  ],\n  \"userName\": \"{{overlap_email}}\",\n  \"name\": {\n    \"givenName\": \"Dana\",\n    \"familyName\": \"Overlap\"\n  },\n  \"emails\": [\n    {\n      \"value\": \"{{overlap_email}}\",\n      \"type\": \"work\",\n      \"primary\": \"true\"\n    }\n  ],\n  \"active\": true,\n  \"roles\": [\n    {\n      \"value\": \"APP-FlexCount-Group394-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Group394-{{env_suffix}}\",\n      \"primary\": \"true\"\n    },\n    {\n      \"value\": \"APP-FlexCount-Group398-{{env_suffix}}\",\n      \"displayName\": \"APP-FlexCount-Group398-{{env_suffix}}\",\n      \"primary\": \"false\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-N2 Name-only patch on a REGIONAL user (region guard)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// WHY THIS EXISTS:",
+                  "// TC-04 does the same thing on an ADMIN \u2014 who has no regions to lose.",
+                  "// This is the ONLY test that proves the region guard works.",
+                  "//",
+                  "// No roles in the patch -> ParsedGroupNames empty -> region lookup skipped",
+                  "// -> Region1..4 serialise as [] -> UpdateUserCommandHandler guard catches it:",
+                  "//      if (!becomingRegional || hasIncomingRegions)   // false || false = false -> SKIP",
+                  "//",
+                  "// VERIFY IN DB: all 7 region rows STILL THERE.",
+                  "//",
+                  "// IF THE REGIONS VANISH, STOP AND ESCALATE.",
+                  "// That guard has been removed or broken, and every Regional user will lose",
+                  "// their market access on their next name change. That is a production incident."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "Protects against silent region wipe. Run this on every release.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"replace\",\n      \"path\": \"name.familyName\",\n      \"value\": \"Changed\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC-N3 Patch with a group that is not in the database",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// CURRENT BEHAVIOUR (known gap G-01): 200 OK, old regions kept.",
+                  "pm.test(\"200 OK \u2014 documents the CURRENT fail-open (gap G-01)\", () => pm.response.to.have.status(200));",
+                  "//",
+                  "// Group999 matches the Group\\d+ regex so it is accepted as Regional.",
+                  "// SearchCustomerGroups finds nothing -> Customer API 404 -> we return an empty list",
+                  "// -> empty regions -> guard skips -> user keeps their OLD access. Entra logs success.",
+                  "// Only trace: \"no matching groups found\" at Information level.",
+                  "//",
+                  "// VERIFY IN DB: the old regions are unchanged.",
+                  "//",
+                  "// WHEN G-01 IS FIXED: change this to expect 400 and update 04-testing.md."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scim_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/scim+json"
+              }
+            ],
+            "url": {
+              "raw": "{{scim_base_url}}/scim/v2/Users/{{regional_email_enc}}",
+              "host": [
+                "{{scim_base_url}}"
+              ],
+              "path": [
+                "scim",
+                "v2",
+                "Users",
+                "{{regional_email_enc}}"
+              ]
+            },
+            "description": "Documents the fail-open. This is the most likely way the system silently does the wrong thing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"Add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"{\\\"id\\\": \\\"x\\\", \\\"value\\\": \\\"APP-FlexCount-Group999-{{env_suffix}}\\\", \\\"displayName\\\": \\\"APP-FlexCount-Group999-{{env_suffix}}\\\"}\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Three cases that find real bugs. Add them to your regression run."
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// URL-encode the emails so they can be used as {id} in the path",
+          "const enc = (k) => { const v = pm.environment.get(k); if (v) pm.environment.set(k + '_enc', encodeURIComponent(v)); };",
+          "['admin_email','corporate_email','regional_email','multi_admin_email','multi_corporate_email','multi_regional_email','overlap_email'].forEach(enc);",
+          "",
+          "if (!pm.environment.get('scim_token')) {",
+          "  console.warn('scim_token is empty. Get it from Key Vault (secret: ScimToken) and paste it into the environment.');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Content-Type is application/scim+json', function () {",
+          "  const ct = pm.response.headers.get('Content-Type');",
+          "  if (pm.response.code !== 204 && ct) { pm.expect(ct).to.include('scim+json'); }",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "env_suffix",
+      "value": "Dev"
+    }
+  ]
+}

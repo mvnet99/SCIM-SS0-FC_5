@@ -1,0 +1,144 @@
+<mxfile host="app.diagrams.net" agent="FlexCount docs" version="24.0.0">
+  <diagram name="SCIM Azure Infrastructure" id="scim-infra">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="FlexCount SCIM API — Azure Infrastructure" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="600" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Source of truth: this .drawio file. Export a PNG next to it for the wiki. See docs/02-architecture.md." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="48" width="700" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ============ TARGET BOUNDARY ============ -->
+        <mxCell id="targetBoundary" value="Target (external vendor)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#999999;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="240" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="targetEntra" value="Target Entra ID&#xa;(provisioning job, every ~40 min)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.azure2.identity.azure_active_directory;" vertex="1" parent="1">
+          <mxGeometry x="105" y="130" width="68" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- ============ AZURE BOUNDARY ============ -->
+        <mxCell id="azureBoundary" value="WIS Azure Subscription" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6F2FB;strokeColor=#0078D4;dashed=0;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#0078D4;" vertex="1" parent="1">
+          <mxGeometry x="340" y="90" width="1000" height="640" as="geometry" />
+        </mxCell>
+
+        <!-- SCIM API -->
+        <mxCell id="scimBox" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0078D4;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="380" y="120" width="220" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="scimIcon" value="FlexCount SCIM API&#xa;WIS_SCIMApp_RestAPI&#xa;.NET 8 · Container Apps" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=1;aspect=fixed;shape=mxgraph.azure2.compute.container_instances;" vertex="1" parent="1">
+          <mxGeometry x="456" y="140" width="68" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- Key Vault -->
+        <mxCell id="kv" value="Azure Key Vault&#xa;ScimToken, ScimServiceEmail,&#xa;CustomerApiBaseUrl, B2C IDs" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.azure2.security.key_vaults;" vertex="1" parent="1">
+          <mxGeometry x="456" y="360" width="68" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- Entra (outbound token) -->
+        <mxCell id="entraToken" value="Microsoft Entra ID&#xa;login.microsoftonline.com&#xa;OAuth client credentials" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.azure2.identity.azure_active_directory;" vertex="1" parent="1">
+          <mxGeometry x="456" y="560" width="68" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- APIM -->
+        <mxCell id="apim" value="API Management&#xa;CustomerApiBaseUrl" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.azure2.integration.api_management_services;" vertex="1" parent="1">
+          <mxGeometry x="726" y="160" width="68" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- AKS -->
+        <mxCell id="aksBox" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0078D4;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="900" y="120" width="400" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="aksLabel" value="AKS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#0078D4;" vertex="1" parent="1">
+          <mxGeometry x="910" y="128" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="aksIcon" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.azure2.containers.kubernetes_services;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="128" width="40" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="custApi" value="WIS_CustomerApp_RestAPI&#xa;/customerapprestapi/*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0078D4;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="940" y="180" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dbSvc" value="flexcount-database-services&#xa;MediatR · Dapper · EF Core" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0078D4;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="940" y="290" width="220" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- SQL -->
+        <mxCell id="sql" value="Azure SQL&#xa;WIS_Database&#xa;Corporate_User · User_Region&#xa;Customer_Groups" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.azure2.databases.sql_database;" vertex="1" parent="1">
+          <mxGeometry x="1016" y="470" width="68" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- Datadog -->
+        <mxCell id="datadog" value="Datadog&#xa;SCIM_AUDIT lines&#xa;via datadog-init in the image" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#632CA6;fontSize=11;fontStyle=1;fontColor=#632CA6;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="660" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ============ ARROWS ============ -->
+        <mxCell id="a1" value="SCIM 2.0 / HTTPS&#xa;static bearer token&#xa;every ~40 min" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#D83B01;strokeWidth=2;fontSize=10;fontColor=#D83B01;endArrow=block;endFill=1;" edge="1" parent="1" source="targetEntra" target="scimBox">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a2" value="read secrets at startup&#xa;DefaultAzureCredential" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;strokeWidth=1;dashed=1;fontSize=10;fontColor=#666666;endArrow=block;endFill=1;" edge="1" parent="1" source="scimBox" target="kv">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a3" value="get OAuth token&#xa;client credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;strokeWidth=1;dashed=1;fontSize=10;fontColor=#666666;endArrow=block;endFill=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="scimBox" target="entraToken">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="360" y="195" /><mxPoint x="360" y="594" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="a4" value="Bearer token +&#xa;X-Service-Account&#xa;X-Customer-Id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#107C10;strokeWidth=2;fontSize=10;fontColor=#107C10;endArrow=block;endFill=1;" edge="1" parent="1" source="scimBox" target="apim">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#107C10;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="apim" target="custApi">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a6" value="internal service client" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#107C10;strokeWidth=2;fontSize=10;fontColor=#107C10;endArrow=block;endFill=1;" edge="1" parent="1" source="custApi" target="dbSvc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a7" value="Dapper / EF Core" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#107C10;strokeWidth=2;fontSize=10;fontColor=#107C10;endArrow=block;endFill=1;" edge="1" parent="1" source="dbSvc" target="sql">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a8" value="stdout JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#632CA6;strokeWidth=1;dashed=1;fontSize=10;fontColor=#632CA6;endArrow=block;endFill=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="scimBox" target="datadog">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="435" y="640" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ============ LEGEND ============ -->
+        <mxCell id="legendBox" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="40" y="330" width="240" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="legendTitle" value="Legend" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="52" y="340" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="inbound — Target Entra to us&#xa;(static bearer token)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;fontColor=#D83B01;" vertex="1" parent="1">
+          <mxGeometry x="52" y="368" width="220" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="outbound — us to Customer API&#xa;(OAuth + service account header)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;fontColor=#107C10;" vertex="1" parent="1">
+          <mxGeometry x="52" y="402" width="220" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="supporting — secrets, tokens, logs" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="52" y="436" width="220" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="The SCIM API stores nothing.&#xa;It translates and forwards.&#xa;&#xa;KeyVaultUrl is the only environment&#xa;variable. Everything else comes&#xa;from the vault at startup." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=10;fontColor=#333333;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="52" y="462" width="220" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ============ NOTE ============ -->
+        <mxCell id="note" value="Deployment: azure-pipeline-ci.yml builds, azure-pipeline-cd.yml releases.&#xa;Both are thin wrappers — the real templates live in the DevOpsPipelineTemplates repo, release branch.&#xa;&#xa;Customer_Groups and Customer_Group_Regions are seeded by WIS_Database/Scripts/PS_SSO_Config.sql.&#xa;The SCIM API only ever reads them, via POST /api/users/SearchCustomerGroups." style="text;html=1;strokeColor=#CCCCCC;fillColor=#FFFDE7;align=left;verticalAlign=top;fontSize=10;whiteSpace=wrap;rounded=1;spacingLeft=8;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="640" y="560" width="500" height="90" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
